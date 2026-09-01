@@ -133,20 +133,27 @@ def main():
             if uploaded:
                 image_source = uploaded
         else:
-            url_str = st.text_input("Image URL", placeholder="https://example.com/image.jpg", label_visibility="collapsed")
+            url_str = st.text_input(
+                "Image URL",
+                placeholder="https://example.com/image.jpg",
+                label_visibility="collapsed",
+            )
+            st.caption("Paste a direct image URL (`.jpg`, `.png`, `.webp`), Google search link, or webpage with a featured image.")
             if url_str:
                 image_source = url_str.strip()
 
     # Load Image
     if not image_source:
-        st.info("Select a preset sample or upload an image to begin.")
+        st.info("Select a preset sample, upload an image file, or enter an image URL to begin.")
         return
 
     try:
         pil_image = load_image(image_source)
     except Exception as e:
         st.error(f"Unable to load image: {e}")
+        st.info("💡 **Tip**: To get a direct image link, right-click any image on the web and choose **'Copy Image Address'** (the link usually ends in `.jpg`, `.png`, or `.webp`).")
         return
+
 
     st.markdown("---")
 

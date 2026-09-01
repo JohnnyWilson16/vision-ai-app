@@ -2,7 +2,7 @@
 Image processing and ingestion utilities.
 
 Handles safe RGB conversion, remote URL fetching, local file loading,
-automatic HTML og:image extraction, and EXIF orientation normalization.
+automatic HTML og:image extraction, redirect unpacking, and EXIF normalization.
 
 Author: Johnny Wilson Dougherty
 """
@@ -41,9 +41,29 @@ def prepare_image_rgb(image: Image.Image) -> Image.Image:
 
 
 def normalize_image_url(url: str) -> str:
-    """Rewrite common image hosting URLs to direct raw asset endpoints."""
+    """Rewrite search redirects and common hosting URLs to direct raw image endpoints."""
     clean_url = url.strip()
-    
+
+    # Google image search redirect
+    if "google." in clean_url and "imgurl=" in clean_url:
+        try:
+            parsed = urllib.parse.urlparse(clean_url)
+            params = urllib.parse.parse_qs(parsed.query)
+            if "imgurl" in params and params["imgurl"]:
+                return urllib.parse.unquote(params["imgurl"][0])
+        except Exception:
+            pass
+
+    # Bing image search redirect
+    if "bing.com" in clean_url and "mediaurl=" in clean_url:
+        try:
+            parsed = urllib.parse.urlparse(clean_url)
+            params = urllib.parse.parse_qs(parsed.query)
+            if "mediaurl" in params and params["mediaurl"]:
+                return urllib.parse.unquote(params["mediaurl"][0])
+        except Exception:
+            pass
+
     # GitHub blob URL -> raw content URL
     github_match = re.match(r"^https?://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.+)$", clean_url)
     if github_match:
@@ -60,13 +80,20 @@ def normalize_image_url(url: str) -> str:
         file_id = gdrive_match.group(1)
         return f"https://drive.google.com/uc?export=download&id={file_id}"
 
+    # Imgur page -> direct image
+    imgur_match = re.match(r"^https?://imgur\.com/([a-zA-Z0-9]+)$", clean_url)
+    if imgur_match:
+        img_id = imgur_match.group(1)
+        return f"https://i.imgur.com/{img_id}.jpg"
+
     return clean_url
 
 
 def extract_image_url_from_html(html_text: str, base_url: str) -> Optional[str]:
     """Inspect an HTML document for OpenGraph, Twitter card, or prominent image tags."""
-    # 1. OpenGraph Image tag
+    # 1. OpenGraph Image tags
     og_patterns = [
+        r'<meta\s+[^>]*property=["\']og:image:secure_url["\']\s+[^>]*content=["\']([^"\']+)["\']',
         r'<meta\s+[^>]*property=["\']og:image["\']\s+[^>]*content=["\']([^"\']+)["\']',
         r'<meta\s+[^>]*content=["\']([^"\']+)["\']\s+[^>]*property=["\']og:image["\']',
     ]
@@ -75,8 +102,9 @@ def extract_image_url_from_html(html_text: str, base_url: str) -> Optional[str]:
         if match:
             return urllib.parse.urljoin(base_url, match.group(1))
 
-    # 2. Twitter Image tag
+    # 2. Twitter Image tags
     tw_patterns = [
+        r'<meta\s+[^>]*name=["\']twitter:image:src["\']\s+[^>]*content=["\']([^"\']+)["\']',
         r'<meta\s+[^>]*name=["\']twitter:image["\']\s+[^>]*content=["\']([^"\']+)["\']',
         r'<meta\s+[^>]*content=["\']([^"\']+)["\']\s+[^>]*name=["\']twitter:image["\']',
     ]
@@ -85,7 +113,12 @@ def extract_image_url_from_html(html_text: str, base_url: str) -> Optional[str]:
         if match:
             return urllib.parse.urljoin(base_url, match.group(1))
 
-    # 3. First prominent <img> tag pointing to common image extensions
+    # 3. Link rel image_src / preload
+    link_match = re.search(r'<link\s+[^>]*rel=["\']image_src["\']\s+[^>]*href=["\']([^"\']+)["\']', html_text, re.IGNORECASE)
+    if link_match:
+        return urllib.parse.urljoin(base_url, link_match.group(1))
+
+    # 4. First prominent <img> tag pointing to common image extensions
     img_matches = re.findall(r'<img\s+[^>]*src=["\']([^"\']+\.(?:png|jpg|jpeg|webp)(?:\?[^"\']*)?)["\']', html_text, re.IGNORECASE)
     for candidate in img_matches:
         cand_lower = candidate.lower()
@@ -107,11 +140,11 @@ def fetch_image_from_url(url: str, max_redirects: int = 2) -> Image.Image:
         response = requests.get(normalized_url, headers=headers, stream=True, timeout=20)
         response.raise_for_status()
     except requests.RequestException as e:
-        raise ValueError(f"Failed to fetch remote URL: {e}")
+        raise ValueError(f"Failed to fetch remote URL '{normalized_url}': {e}")
 
     content = response.content
     if len(content) == 0:
-        raise ValueError(f"Remote URL returned an empty response.")
+        raise ValueError("Remote URL returned an empty response.")
 
     # Attempt direct PIL decode
     try:
@@ -130,8 +163,8 @@ def fetch_image_from_url(url: str, max_redirects: int = 2) -> Image.Image:
                 pass
 
         raise ValueError(
-            f"The provided URL returned a webpage instead of an image file (Content-Type: '{content_type}'). "
-            "Please provide a direct link to an image file ending in .jpg, .png, or .webp."
+            f"The provided link returned an HTML webpage rather than a direct image file (Content-Type: '{content_type}'). "
+            "Please provide a direct image link ending in .jpg, .png, or .webp, or right-click the image on the web and select 'Copy Image Address'."
         )
 
 
@@ -142,7 +175,7 @@ def load_image(
     Load an image from various source types and return a verified RGB PIL Image.
     
     Supports:
-    - Web URLs (direct image links or webpages with og:image metadata)
+    - Web URLs (direct image links, Google search links, or webpages with og:image metadata)
     - Local filesystem paths (str or Path)
     - In-memory bytes or file-like streams (e.g., Streamlit UploadedFile)
     - Existing PIL Image instances
