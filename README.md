@@ -1,10 +1,17 @@
 # Florence-2 Vision AI
 
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=JohnnyWilson16/vision-ai-app&branch=main&mainModule=app.py)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-red.svg)](https://pytorch.org/)
+[![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-Transformers-yellow.svg)](https://huggingface.co/docs/transformers)
+
 An open-source Python framework and interactive workspace for multi-task computer vision using Microsoft's **Florence-2** Vision-Language Model (VLM).
 
 Florence-2 treats diverse vision tasks—including object detection, optical character recognition (OCR), dense region captioning, and multi-level scene descriptions—as a unified sequence-to-sequence problem. This project provides a production-grade inference engine, a command-line interface, a Streamlit evaluation dashboard, and an automated test suite.
 
 ---
+
 
 ## Why Florence-2?
 
