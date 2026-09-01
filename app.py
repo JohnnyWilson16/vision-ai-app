@@ -184,12 +184,18 @@ def main():
 
         with img_col1:
             st.markdown("**Original Image**")
-            st.image(result["image"], use_column_width=True)
+            try:
+                st.image(result["image"], use_container_width=True)
+            except TypeError:
+                st.image(result["image"])
 
         with img_col2:
             st.markdown("**Model Output**")
             if has_annotations:
-                st.image(result["annotated_image"], use_column_width=True)
+                try:
+                    st.image(result["annotated_image"], use_container_width=True)
+                except TypeError:
+                    st.image(result["annotated_image"])
             else:
                 # Text-only task output
                 text_content = parsed.get(result["task"].value, result["raw_text"])
