@@ -8,12 +8,14 @@ GitHub: https://github.com/JohnnyWilson16
 Email: johnnydougherty09@gmail.com
 """
 
+import gc
 import io
 import json
 import sys
 from pathlib import Path
 from PIL import Image
 import streamlit as st
+
 
 # Add src/ to path
 src_path = Path(__file__).parent / "src"
@@ -73,12 +75,13 @@ def main():
     selected_device = st.sidebar.selectbox("Compute Accelerator", device_options, index=default_index)
 
     with st.sidebar.expander("Inference & Box Filtering", expanded=False):
-        beam_count = st.slider("Beam Search Width", min_value=1, max_value=5, value=3)
-        max_tokens = st.slider("Max Output Tokens", min_value=128, max_value=2048, value=1024, step=128)
+        beam_count = st.slider("Beam Search Width", min_value=1, max_value=3, value=1, help="1 = Greedy search (fastest, lowest memory).")
+        max_tokens = st.slider("Max Output Tokens", min_value=128, max_value=1024, value=512, step=128)
         st.markdown("---")
         enable_nms = st.checkbox("Declutter Overlapping Boxes (NMS)", value=True, help="Removes redundant duplicate boxes and microscopic noise.")
-        max_regions = st.slider("Max Displayed Regions / Boxes", min_value=1, max_value=30, value=10, help="Caps the number of candidate proposals or boxes displayed.")
+        max_regions = st.slider("Max Displayed Regions / Boxes", min_value=1, max_value=25, value=10, help="Caps the number of candidate proposals or boxes displayed.")
         iou_thresh = st.slider("Overlap IoU Threshold", min_value=0.1, max_value=0.9, value=0.50, step=0.05, help="Lower values aggressively suppress overlapping boxes.")
+
 
     st.sidebar.markdown("---")
     st.sidebar.markdown(
@@ -176,9 +179,11 @@ def main():
                     render_annotation=True,
                 )
                 st.session_state["inference_result"] = result
+                gc.collect()
             except Exception as e:
                 st.error(f"Inference execution failed: {e}")
                 return
+
 
     # Render Results
 
