@@ -62,3 +62,26 @@ def test_load_image_from_local_file(tmp_path):
 def test_load_image_file_not_found():
     with pytest.raises(FileNotFoundError):
         load_image("/non/existent/path/image_12345.jpg")
+
+
+def test_load_file_like_object_with_seek():
+    img = Image.new("RGB", (70, 70), color=(10, 20, 30))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    # Simulate an already-read buffer
+    buf.read()
+    
+    loaded = load_image(buf)
+    assert isinstance(loaded, Image.Image)
+    assert loaded.size == (70, 70)
+
+
+def test_load_bundled_samples():
+    samples_dir = Path(__file__).parent.parent / "assets" / "samples"
+    assert samples_dir.exists()
+    for sample_file in samples_dir.glob("*.*"):
+        loaded = load_image(sample_file)
+        assert isinstance(loaded, Image.Image)
+        assert loaded.mode == "RGB"
+        assert loaded.size[0] > 0 and loaded.size[1] > 0
+

@@ -33,11 +33,14 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+SAMPLES_DIR = Path(__file__).parent / "assets" / "samples"
+
 SAMPLE_IMAGES = {
-    "Automobile Scene": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg",
-    "Interior & Objects": "https://raw.githubusercontent.com/openvinotoolkit/openvino_notebooks/main/notebooks/florence2-vision/sample_images/living_room.jpg",
-    "Printed Text Document": "https://raw.githubusercontent.com/openvinotoolkit/openvino_notebooks/main/notebooks/florence2-vision/sample_images/receipt.jpg",
+    "Automobile / Street Scene": str(SAMPLES_DIR / "car.jpg") if (SAMPLES_DIR / "car.jpg").exists() else "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg",
+    "Animals & Pets": str(SAMPLES_DIR / "cat.jpg") if (SAMPLES_DIR / "cat.jpg").exists() else "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/cat.jpg",
+    "Printed Text & Document Receipt": str(SAMPLES_DIR / "document.png") if (SAMPLES_DIR / "document.png").exists() else "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg",
 }
+
 
 
 @st.cache_resource(show_spinner=False)

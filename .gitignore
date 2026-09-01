@@ -49,8 +49,5 @@ Thumbs.db
 # Output exports
 output/
 outputs/
-*.png
-*.jpg
-*.jpeg
-*.json
-!Vision_AI_Florence2_Walkthrough.ipynb
+export/
+
