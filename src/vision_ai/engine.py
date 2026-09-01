@@ -18,8 +18,10 @@ from .config import VisionAIConfig
 from .tasks import VisionTask, TASK_METADATA, get_task_by_name
 from .image_utils import load_image, prepare_image_rgb
 from .visualizer import annotate_image
+from .postprocessing import filter_prediction_clutter
 
 logger = logging.getLogger("vision_ai.engine")
+
 
 
 class VisionAIEngine:
@@ -86,6 +88,10 @@ class VisionAIEngine:
         text_input: Optional[str] = None,
         num_beams: Optional[int] = None,
         max_new_tokens: Optional[int] = None,
+        filter_clutter: bool = True,
+        max_boxes: int = 12,
+        iou_threshold: float = 0.55,
+        min_area_ratio: float = 0.005,
         render_annotation: bool = True,
     ) -> Dict[str, Any]:
         """
@@ -97,16 +103,14 @@ class VisionAIEngine:
             text_input: Optional text input for grounding/prompting
             num_beams: Override default beam count for generation
             max_new_tokens: Override max token length
+            filter_clutter: Whether to apply NMS and area filtering to reduce duplicate/microscopic boxes
+            max_boxes: Maximum number of bounding boxes to keep after NMS
+            iou_threshold: IoU overlap threshold for suppression (0.1 = strict, 0.9 = loose)
+            min_area_ratio: Minimum box area relative to image (e.g. 0.005 = 0.5%)
             render_annotation: Whether to draw bounding boxes on the result image
 
         Returns:
-            Dictionary containing:
-            - 'task': VisionTask enum
-            - 'parsed_answer': Structured output dictionary
-            - 'raw_text': Decoded string output
-            - 'image': Original RGB PIL Image
-            - 'annotated_image': PIL Image with bounding boxes (if applicable)
-            - 'latency_ms': Execution duration in milliseconds
+            Dictionary containing task result, structured dict, and images.
         """
         if not self._is_loaded:
             self.load_model()
@@ -171,13 +175,24 @@ class VisionAIEngine:
             image_size=(w, h),
         )
 
+        # Apply Non-Maximum Suppression / box decluttering if enabled
+        if filter_clutter and TASK_METADATA.get(task_enum, {}).get("has_boxes", False):
+            parsed_answer = filter_prediction_clutter(
+                prediction=parsed_answer,
+                image_size=(w, h),
+                iou_threshold=iou_threshold,
+                min_area_ratio=min_area_ratio,
+                max_boxes=max_boxes,
+            )
+
         end_time = time.perf_counter()
         latency_ms = (end_time - start_time) * 1000.0
 
         # Render visual bounding boxes if requested and applicable
         annotated_img = None
-        if render_annotation and TASK_METADATA[task_enum]["has_boxes"]:
+        if render_annotation and TASK_METADATA.get(task_enum, {}).get("has_boxes", False):
             annotated_img = annotate_image(pil_image, parsed_answer)
+
 
         return {
             "task": task_enum,

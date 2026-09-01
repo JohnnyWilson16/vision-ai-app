@@ -72,9 +72,13 @@ def main():
     default_index = device_options.index(default_dev) if default_dev in device_options else 2
     selected_device = st.sidebar.selectbox("Compute Accelerator", device_options, index=default_index)
 
-    with st.sidebar.expander("Inference Parameters", expanded=False):
+    with st.sidebar.expander("Inference & Box Filtering", expanded=False):
         beam_count = st.slider("Beam Search Width", min_value=1, max_value=5, value=3)
         max_tokens = st.slider("Max Output Tokens", min_value=128, max_value=2048, value=1024, step=128)
+        st.markdown("---")
+        enable_nms = st.checkbox("Declutter Overlapping Boxes (NMS)", value=True, help="Removes redundant duplicate boxes and microscopic noise.")
+        max_regions = st.slider("Max Displayed Regions / Boxes", min_value=1, max_value=30, value=10, help="Caps the number of candidate proposals or boxes displayed.")
+        iou_thresh = st.slider("Overlap IoU Threshold", min_value=0.1, max_value=0.9, value=0.50, step=0.05, help="Lower values aggressively suppress overlapping boxes.")
 
     st.sidebar.markdown("---")
     st.sidebar.markdown(
@@ -154,7 +158,6 @@ def main():
         st.info("💡 **Tip**: To get a direct image link, right-click any image on the web and choose **'Copy Image Address'** (the link usually ends in `.jpg`, `.png`, or `.webp`).")
         return
 
-
     st.markdown("---")
 
     # Run Trigger
@@ -167,6 +170,9 @@ def main():
                     task=selected_task,
                     num_beams=beam_count,
                     max_new_tokens=max_tokens,
+                    filter_clutter=enable_nms,
+                    max_boxes=max_regions,
+                    iou_threshold=iou_thresh,
                     render_annotation=True,
                 )
                 st.session_state["inference_result"] = result
@@ -175,6 +181,7 @@ def main():
                 return
 
     # Render Results
+
     if "inference_result" in st.session_state:
         result = st.session_state["inference_result"]
         parsed = result["parsed_answer"]

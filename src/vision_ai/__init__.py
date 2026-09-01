@@ -14,6 +14,7 @@ from .tasks import VisionTask
 from .image_utils import load_image, prepare_image_rgb
 from .visualizer import annotate_image
 from .exporter import export_results_json
+from .postprocessing import filter_prediction_clutter, suppress_overlapping_bboxes
 
 __all__ = [
     "VisionAIConfig",
@@ -23,6 +24,8 @@ __all__ = [
     "prepare_image_rgb",
     "annotate_image",
     "export_results_json",
+    "filter_prediction_clutter",
+    "suppress_overlapping_bboxes",
 ]
 __version__ = "0.1.0"
 __author__ = "Johnny Wilson Dougherty"
