@@ -71,3 +71,37 @@ def test_export_results_json(tmp_path):
     assert data["metadata"]["task"] == "General Caption"
     assert data["metadata"]["image_size"] == {"width": 640, "height": 480}
     assert out_file.exists()
+
+
+def test_format_region_proposals_without_labels():
+    mock_rp = {
+        "<REGION_PROPOSAL>": {
+            "bboxes": [[50, 60, 200, 300], [250, 80, 400, 350]],
+            "labels": ["", ""],
+        }
+    }
+    records = format_detection_records(mock_rp)
+    assert len(records) == 2
+    assert records[0]["label"] == "Region Proposal 1"
+    assert records[0]["xmin"] == 50
+    assert records[0]["ymin"] == 60
+    assert records[1]["label"] == "Region Proposal 2"
+
+
+def test_format_ocr_with_quad_boxes():
+    mock_ocr = {
+        "<OCR_WITH_REGION>": {
+            "quad_boxes": [[10, 15, 100, 15, 100, 45, 10, 45]],
+            "labels": ["RECEIPT"],
+        }
+    }
+    records = format_detection_records(mock_ocr)
+    assert len(records) == 1
+    assert records[0]["label"] == "RECEIPT"
+    assert records[0]["xmin"] == 10
+    assert records[0]["ymin"] == 15
+    assert records[0]["xmax"] == 100
+    assert records[0]["ymax"] == 45
+    assert records[0]["width"] == 90
+    assert records[0]["height"] == 30
+

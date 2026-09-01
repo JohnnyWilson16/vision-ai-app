@@ -12,29 +12,77 @@ from PIL import Image
 
 
 def format_detection_records(prediction: Dict[str, Any], image_size: Optional[tuple] = None) -> List[Dict[str, Any]]:
-    """Flatten prediction bounding boxes and labels into tabular records."""
+    """
+    Flatten prediction bounding boxes, region proposals, and OCR quad-boxes into tabular records.
+    """
     records = []
     for task_key, data in prediction.items():
         if not isinstance(data, dict):
             continue
+
         bboxes = data.get("bboxes", [])
         labels = data.get("labels", [])
+        quad_boxes = data.get("quad_boxes", []) or data.get("polygons", [])
 
-        for idx, box in enumerate(bboxes):
-            label = labels[idx] if idx < len(labels) else f"item_{idx+1}"
-            rec = {
-                "index": idx + 1,
-                "label": label,
-                "xmin": box[0] if len(box) > 0 else None,
-                "ymin": box[1] if len(box) > 1 else None,
-                "xmax": box[2] if len(box) > 2 else None,
-                "ymax": box[3] if len(box) > 3 else None,
-            }
-            if len(box) == 4:
-                rec["width"] = box[2] - box[0]
-                rec["height"] = box[3] - box[1]
-                rec["area"] = rec["width"] * rec["height"]
-            records.append(rec)
+        is_proposal = task_key in ("<REGION_PROPOSAL>", "REGION_PROPOSAL")
+
+        # 1. Standard 4-point bounding boxes (Object Detection, Dense Captions, Region Proposals)
+        if bboxes:
+            for idx, box in enumerate(bboxes):
+                raw_label = labels[idx] if idx < len(labels) else ""
+                if not raw_label or not str(raw_label).strip():
+                    label = f"Region Proposal {idx+1}" if is_proposal else f"Object {idx+1}"
+                else:
+                    label = str(raw_label).strip()
+
+                rec = {
+                    "index": idx + 1,
+                    "label": label,
+                    "xmin": round(box[0], 1) if len(box) > 0 and box[0] is not None else None,
+                    "ymin": round(box[1], 1) if len(box) > 1 and box[1] is not None else None,
+                    "xmax": round(box[2], 1) if len(box) > 2 and box[2] is not None else None,
+                    "ymax": round(box[3], 1) if len(box) > 3 and box[3] is not None else None,
+                }
+                if len(box) == 4 and all(v is not None for v in box):
+                    rec["width"] = round(box[2] - box[0], 1)
+                    rec["height"] = round(box[3] - box[1], 1)
+                    rec["area"] = round(rec["width"] * rec["height"], 1)
+                records.append(rec)
+
+        # 2. Quad / polygon boxes (e.g. from OCR with Region)
+        elif quad_boxes:
+            for idx, quad in enumerate(quad_boxes):
+                raw_label = labels[idx] if idx < len(labels) else ""
+                label = str(raw_label).strip() if raw_label else f"Text Line {idx+1}"
+
+                # Handle [x1, y1, x2, y2, x3, y3, x4, y4] or list of (x, y) pairs
+                if len(quad) == 8:
+                    xs = [quad[0], quad[2], quad[4], quad[6]]
+                    ys = [quad[1], quad[3], quad[5], quad[7]]
+                    xmin, xmax = min(xs), max(xs)
+                    ymin, ymax = min(ys), max(ys)
+                elif isinstance(quad[0], (list, tuple)):
+                    xs = [p[0] for p in quad]
+                    ys = [p[1] for p in quad]
+                    xmin, xmax = min(xs), max(xs)
+                    ymin, ymax = min(ys), max(ys)
+                else:
+                    xmin, ymin, xmax, ymax = None, None, None, None
+
+                rec = {
+                    "index": idx + 1,
+                    "label": label,
+                    "xmin": round(xmin, 1) if xmin is not None else None,
+                    "ymin": round(ymin, 1) if ymin is not None else None,
+                    "xmax": round(xmax, 1) if xmax is not None else None,
+                    "ymax": round(ymax, 1) if ymax is not None else None,
+                }
+                if xmin is not None and ymin is not None and xmax is not None and ymax is not None:
+                    rec["width"] = round(xmax - xmin, 1)
+                    rec["height"] = round(ymax - ymin, 1)
+                    rec["area"] = round(rec["width"] * rec["height"], 1)
+                records.append(rec)
+
     return records
 
 

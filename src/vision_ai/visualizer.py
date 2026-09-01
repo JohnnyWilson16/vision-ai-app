@@ -75,13 +75,19 @@ def annotate_image(
         bboxes = data.get("bboxes", [])
         labels = data.get("labels", [])
         quad_boxes = data.get("quad_boxes", []) or data.get("polygons", [])
+        is_proposal = task_key in ("<REGION_PROPOSAL>", "REGION_PROPOSAL")
 
         # Handle 4-point bounding boxes [xmin, ymin, xmax, ymax]
         if bboxes:
             for idx, box in enumerate(bboxes):
-                if len(box) == 4:
+                if len(box) == 4 and all(v is not None for v in box):
                     xmin, ymin, xmax, ymax = box
-                    label = labels[idx] if idx < len(labels) else f"Object {idx+1}"
+                    raw_label = labels[idx] if idx < len(labels) else ""
+                    if not raw_label or not str(raw_label).strip():
+                        label = f"Region {idx+1}" if is_proposal else f"Object {idx+1}"
+                    else:
+                        label = str(raw_label).strip()
+
                     color = _get_color_for_label(label, color_map)
 
                     # Draw rectangle outline
@@ -117,8 +123,9 @@ def annotate_image(
         # Handle quad / polygon boxes (OCR with Region)
         if quad_boxes:
             for idx, quad in enumerate(quad_boxes):
-                label = labels[idx] if idx < len(labels) else ""
-                color = _get_color_for_label(label or "Text", color_map)
+                raw_label = labels[idx] if idx < len(labels) else ""
+                label = str(raw_label).strip() if raw_label else f"Text {idx+1}"
+                color = _get_color_for_label(label, color_map)
                 
                 # quad might be [x1, y1, x2, y2, x3, y3, x4, y4] or list of pairs
                 points: List[Tuple[float, float]] = []
@@ -131,7 +138,7 @@ def annotate_image(
                     draw.polygon(points, outline=color, width=line_width)
                     if show_labels and label:
                         first_pt = points[0]
-                        draw.text((first_pt[0], first_pt[1] - 14), label, fill=color, font=font)
+                        draw.text((first_pt[0], max(0, first_pt[1] - 14)), label, fill=color, font=font)
 
     return annotated
 
@@ -157,13 +164,19 @@ def plot_annotated_matplotlib(
 
         bboxes = data.get("bboxes", [])
         labels = data.get("labels", [])
+        is_proposal = task_key in ("<REGION_PROPOSAL>", "REGION_PROPOSAL")
 
         for idx, box in enumerate(bboxes):
             if len(box) == 4:
                 xmin, ymin, xmax, ymax = box
                 w = xmax - xmin
                 h = ymax - ymin
-                label = labels[idx] if idx < len(labels) else f"Entity {idx+1}"
+                raw_label = labels[idx] if idx < len(labels) else ""
+                if not raw_label or not str(raw_label).strip():
+                    label = f"Region {idx+1}" if is_proposal else f"Entity {idx+1}"
+                else:
+                    label = str(raw_label).strip()
+
                 color = _get_color_for_label(label, color_map)
 
                 rect = patches.Rectangle(
